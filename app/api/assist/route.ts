@@ -19,10 +19,15 @@ export async function POST(req: NextRequest) {
 
   const { session, message, history = [] } = body;
 
-  // ── Validate API key ─────────────────────────────────────────────────────
-  if (!process.env.ANTHROPIC_API_KEY) {
+  // ── Validate API key for the active provider ────────────────────────────
+  const provider = process.env.AI_PROVIDER ?? 'gemini';
+  const missingKey =
+    provider === 'claude'
+      ? !process.env.ANTHROPIC_API_KEY && 'ANTHROPIC_API_KEY'
+      : !process.env.GEMINI_API_KEY && 'GEMINI_API_KEY';
+  if (missingKey) {
     return new Response(
-      JSON.stringify({ error: 'ANTHROPIC_API_KEY is not configured on the server.' }),
+      JSON.stringify({ error: `${missingKey} is not configured on the server.` }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
