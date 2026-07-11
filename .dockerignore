@@ -8,3 +8,5 @@ README.md
 .env
 .env.*
 npm-debug.log
+.claude
+*.tsbuildinfo
