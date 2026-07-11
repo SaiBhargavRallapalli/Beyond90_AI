@@ -12,6 +12,8 @@ const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
 // ---------------------------------------------------------------------------
 interface GeminiPart {
   text?: string;
+  thought?: boolean;          // true on internal thinking parts (Gemini 2.5+)
+  thoughtSignature?: string;  // must be echoed back verbatim in history
   functionCall?: { name: string; args: Record<string, unknown> };
   functionResponse?: { name: string; response: { content: string } };
 }
@@ -157,7 +159,11 @@ export async function* streamAssistResponse(
 
           const parts = candidate.content?.parts ?? [];
           for (const part of parts) {
-            if (part.text) {
+            if (part.thought) {
+              // Internal thinking part (Gemini 2.5+): capture with thoughtSignature
+              // but never yield to the user. Must be echoed verbatim in history.
+              modelParts.push(part);
+            } else if (part.text) {
               yield part.text;
               modelParts.push({ text: part.text });
             } else if (part.functionCall) {
