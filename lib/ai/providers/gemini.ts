@@ -1,28 +1,16 @@
-import { GEMINI_FUNCTION_DECLARATIONS } from '@/lib/ai/tools';
-import { handleToolCall } from '@/lib/ai/tool-handlers';
 import { buildSystemPrompt, buildOpsPrompt } from '@/lib/ai/prompts';
 import { VENUES } from '@/lib/venues/data';
+import { generateCrowdForecast, getCrowdLevel } from '@/lib/venues/crowd';
 import type { UserSession, ChatMessage } from '@/lib/types';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-
-// Match whatever the user's API key is provisioned for.
-// gemini-flash-latest is the alias that resolves to the newest Flash model.
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-flash-latest';
 
 // ---------------------------------------------------------------------------
-// Gemini types
-// The raw JSON response may carry additional fields (e.g. thoughtSignature)
-// beyond what we explicitly name. We use unknown-index escape so TypeScript
-// does not strip those fields when we echo parts back in conversation history.
+// Gemini types (no function-calling involved)
 // ---------------------------------------------------------------------------
 interface GeminiPart {
   text?: string;
-  thought?: boolean;
-  thoughtSignature?: string; // present on text/functionCall parts in thinking models
-  functionCall?: { name: string; args: Record<string, unknown> };
-  functionResponse?: { name: string; response: { content: string } };
-  [key: string]: unknown;   // preserve any undocumented fields verbatim
 }
 
 interface GeminiContent {
@@ -31,10 +19,86 @@ interface GeminiContent {
 }
 
 interface GeminiResponse {
-  candidates?: Array<{
-    content: GeminiContent;
-    finishReason?: string;
-  }>;
+  candidates?: Array<{ content: GeminiContent; finishReason?: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// Context injection
+//
+// gemini-flash-latest (gemini-3.5-flash) is a thinking model that attaches
+// thoughtSignature to every function-call response. Echoing those signatures
+// correctly across multi-turn conversations is fragile. Instead we pre-compute
+// all venue intelligence locally and inject it as structured context in the
+// system prompt — one clean request, no function-call round trips, no
+// thoughtSignature surface at all.
+// ---------------------------------------------------------------------------
+function buildVenueContext(session: UserSession): string {
+  const venue = VENUES[session.venueId];
+  const crowd = generateCrowdForecast(venue, session.minutesToKickoff);
+  const crowdMap = new Map(crowd.snapshots.map((s) => [s.nodeId, s]));
+
+  const userNode = venue.nodes.find((n) => n.id === session.currentNodeId);
+
+  const zones = venue.nodes
+    .map((n) => {
+      const c = crowdMap.get(n.id);
+      const lvl = c ? getCrowdLevel(c.occupancy) : 'low';
+      const floor = ['ground', 'concourse', 'upper'][n.level] ?? n.level;
+      return `  • ${n.name} [${n.id}] — ${floor} floor, crowd: ${lvl}${n.accessible ? ', step-free' : ''}`;
+    })
+    .join('\n');
+
+  const facilities = venue.facilities
+    .map((f) => {
+      const node = venue.nodes.find((n) => n.id === f.nodeId);
+      const label = f.type.replace(/_/g, ' ');
+      return `  • ${label}: ${f.name} → ${node?.name ?? f.nodeId}${f.accessible ? ' [ADA]' : ''}${f.operatingHours ? ` (${f.operatingHours})` : ''}`;
+    })
+    .join('\n');
+
+  const connections = venue.edges
+    .map((e) => {
+      const from = venue.nodes.find((n) => n.id === e.from)?.name ?? e.from;
+      const to = venue.nodes.find((n) => n.id === e.to)?.name ?? e.to;
+      const sf = e.stepFree ? ', step-free' : '';
+      return `  • ${from} → ${to} via ${e.travel} (${e.distance}m${sf})`;
+    })
+    .join('\n');
+
+  const hotspots = crowd.hotspots
+    .map((id) => venue.nodes.find((n) => n.id === id)?.name ?? id)
+    .slice(0, 5)
+    .join(', ') || 'None';
+
+  const calm = crowd.safeNodes
+    .map((id) => venue.nodes.find((n) => n.id === id)?.name ?? id)
+    .slice(0, 5)
+    .join(', ') || 'Most areas';
+
+  const timeCtx =
+    session.minutesToKickoff > 0
+      ? `${session.minutesToKickoff} min to kickoff`
+      : `Match in progress (${Math.abs(session.minutesToKickoff)} min elapsed)`;
+
+  return `
+=== LIVE VENUE INTELLIGENCE ===
+Venue   : ${venue.venueName}, ${venue.city} (capacity ${venue.capacity.toLocaleString()})
+Status  : ${timeCtx}
+Fan at  : ${userNode?.name ?? session.currentNodeId}${session.ticketSection ? ` | Section ${session.ticketSection}` : ''}
+
+ZONES & CURRENT CROWD:
+${zones}
+
+FACILITIES:
+${facilities}
+
+WALKING CONNECTIONS (1 metre ≈ 1.5 s at walking pace):
+${connections}
+
+CROWD HOTSPOTS (avoid if possible): ${hotspots}
+LEAST BUSY RIGHT NOW               : ${calm}
+================================
+Answer using ONLY the data above. Never invent zones or facilities not listed.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,15 +106,11 @@ interface GeminiResponse {
 // ---------------------------------------------------------------------------
 function buildBody(
   systemPrompt: string,
-  contents: GeminiContent[],
-  withTools: boolean
+  contents: GeminiContent[]
 ) {
   return {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
-    ...(withTools
-      ? { tools: [{ functionDeclarations: GEMINI_FUNCTION_DECLARATIONS }] }
-      : {}),
     generationConfig: { maxOutputTokens: 1024 },
   };
 }
@@ -64,7 +124,7 @@ function historyToContents(history: ChatMessage[], userMessage: string): GeminiC
   return contents;
 }
 
-function headers() {
+function apiHeaders() {
   return {
     'Content-Type': 'application/json',
     'X-goog-api-key': process.env.GEMINI_API_KEY ?? '',
@@ -72,24 +132,68 @@ function headers() {
 }
 
 // ---------------------------------------------------------------------------
-// Non-streaming generateContent
-//
-// Used for every turn in the agentic loop. The non-streaming endpoint returns
-// the COMPLETE response in one JSON object, meaning thoughtSignature (which
-// gemini-flash-latest / gemini-3.5-flash embeds directly on text and
-// functionCall parts) is never split across chunks. We echo the raw part
-// objects verbatim into the conversation history, so the next turn always
-// has intact signatures.
+// Streaming response (no tools → no thoughtSignature issues)
+// ---------------------------------------------------------------------------
+async function* streamGemini(
+  systemPrompt: string,
+  contents: GeminiContent[]
+): AsyncGenerator<string> {
+  const res = await fetch(
+    `${GEMINI_BASE}/${MODEL}:streamGenerateContent?alt=sse`,
+    {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify(buildBody(systemPrompt, contents)),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini ${res.status}: ${err}`);
+  }
+
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const jsonStr = line.slice(6).trim();
+      if (!jsonStr || jsonStr === '[DONE]') continue;
+
+      let chunk: GeminiResponse;
+      try {
+        chunk = JSON.parse(jsonStr) as GeminiResponse;
+      } catch {
+        continue;
+      }
+
+      for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+        if (part.text) yield part.text;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Non-streaming call (ops analysis)
 // ---------------------------------------------------------------------------
 async function callGemini(
   systemPrompt: string,
-  contents: GeminiContent[],
-  withTools: boolean
-): Promise<GeminiResponse> {
+  contents: GeminiContent[]
+): Promise<string> {
   const res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent`, {
     method: 'POST',
-    headers: headers(),
-    body: JSON.stringify(buildBody(systemPrompt, contents, withTools)),
+    headers: apiHeaders(),
+    body: JSON.stringify(buildBody(systemPrompt, contents)),
   });
 
   if (!res.ok) {
@@ -97,15 +201,17 @@ async function callGemini(
     throw new Error(`Gemini ${res.status}: ${err}`);
   }
 
-  return res.json() as Promise<GeminiResponse>;
+  const data = (await res.json()) as GeminiResponse;
+  return (
+    data.candidates?.[0]?.content?.parts
+      ?.filter((p) => p.text)
+      .map((p) => p.text)
+      .join('') ?? ''
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Streaming assistant response
-//
-// All turns use non-streaming generateContent to avoid the thoughtSignature
-// reassembly problem with SSE chunks. The final text is yielded directly
-// from the response — no second streaming call needed.
+// Public API
 // ---------------------------------------------------------------------------
 export async function* streamAssistResponse(
   session: UserSession,
@@ -113,57 +219,23 @@ export async function* streamAssistResponse(
   history: ChatMessage[]
 ): AsyncGenerator<string> {
   const venue = VENUES[session.venueId];
-  const systemPrompt = buildSystemPrompt(session.role, venue.venueName, session.language);
+  const basePrompt = buildSystemPrompt(session.role, venue.venueName, session.language);
+  const venueContext = buildVenueContext(session);
+  const systemPrompt = `${basePrompt}\n\n${venueContext}`;
+
   const contents = historyToContents(history, message);
-  const toolsUsed = new Set<string>();
 
   try {
-    while (true) {
-      const response = await callGemini(systemPrompt, contents, true);
-      // Use the raw parsed parts — this preserves thoughtSignature and any
-      // other fields Gemini returns without us having to name them all.
-      const parts: GeminiPart[] = response.candidates?.[0]?.content?.parts ?? [];
-
-      const functionCallParts = parts.filter((p) => p.functionCall);
-
-      if (functionCallParts.length === 0) {
-        // No more function calls — yield all visible text parts and exit.
-        for (const part of parts) {
-          if (part.text && !part.thought) {
-            yield part.text;
-          }
-        }
-        break;
-      }
-
-      // Echo the model turn back with ALL raw parts so thoughtSignature
-      // is present for the next request.
-      contents.push({ role: 'model', parts });
-
-      // Execute every function call and gather results.
-      const responseParts: GeminiPart[] = [];
-      for (const part of functionCallParts) {
-        const { name, args } = part.functionCall!;
-        toolsUsed.add(name);
-        const result = await handleToolCall(name, args);
-        responseParts.push({
-          functionResponse: { name, response: { content: result } },
-        });
-      }
-
-      contents.push({ role: 'user', parts: responseParts });
-    }
+    yield* streamGemini(systemPrompt, contents);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     yield `\n\nSorry, I ran into a problem: ${msg}. Please try again.`;
   }
 
-  yield `\n\n[METADATA]${JSON.stringify({ toolsUsed: Array.from(toolsUsed) })}`;
+  // Report venue_context as the "tool" used so the UI chip renders
+  yield `\n\n[METADATA]${JSON.stringify({ toolsUsed: ['venue_context'] })}`;
 }
 
-// ---------------------------------------------------------------------------
-// Non-streaming ops analysis
-// ---------------------------------------------------------------------------
 export async function getOpsAnalysis(
   venueName: string,
   minutesToKickoff: number,
@@ -172,16 +244,12 @@ export async function getOpsAnalysis(
 ): Promise<string> {
   const systemPrompt = buildOpsPrompt(venueName, minutesToKickoff, activeAlerts);
 
-  const response = await callGemini(
-    systemPrompt,
-    [{ role: 'user', parts: [{ text: query }] }],
-    false
-  );
-
-  const text = response.candidates?.[0]?.content?.parts
-    ?.filter((p) => p.text && !p.thought)
-    .map((p) => p.text)
-    .join('');
-
-  return text ?? 'Unable to generate operational analysis at this time.';
+  try {
+    return await callGemini(systemPrompt, [
+      { role: 'user', parts: [{ text: query }] },
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return `Unable to generate analysis: ${msg}`;
+  }
 }
