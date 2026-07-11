@@ -5,17 +5,24 @@ import { VENUES } from '@/lib/venues/data';
 import type { UserSession, ChatMessage } from '@/lib/types';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
+
+// Match whatever the user's API key is provisioned for.
+// gemini-flash-latest is the alias that resolves to the newest Flash model.
+const MODEL = process.env.GEMINI_MODEL ?? 'gemini-flash-latest';
 
 // ---------------------------------------------------------------------------
-// Gemini content types
+// Gemini types
+// The raw JSON response may carry additional fields (e.g. thoughtSignature)
+// beyond what we explicitly name. We use unknown-index escape so TypeScript
+// does not strip those fields when we echo parts back in conversation history.
 // ---------------------------------------------------------------------------
 interface GeminiPart {
   text?: string;
-  thought?: boolean;          // true on internal thinking parts (Gemini 2.5+)
-  thoughtSignature?: string;  // must be echoed back verbatim in history
+  thought?: boolean;
+  thoughtSignature?: string; // present on text/functionCall parts in thinking models
   functionCall?: { name: string; args: Record<string, unknown> };
   functionResponse?: { name: string; response: { content: string } };
+  [key: string]: unknown;   // preserve any undocumented fields verbatim
 }
 
 interface GeminiContent {
@@ -23,19 +30,17 @@ interface GeminiContent {
   parts: GeminiPart[];
 }
 
-interface GeminiCandidate {
-  content: GeminiContent;
-  finishReason?: string;
-}
-
 interface GeminiResponse {
-  candidates?: GeminiCandidate[];
+  candidates?: Array<{
+    content: GeminiContent;
+    finishReason?: string;
+  }>;
 }
 
 // ---------------------------------------------------------------------------
-// Build request body matching the curl format exactly
+// Helpers
 // ---------------------------------------------------------------------------
-function buildRequestBody(
+function buildBody(
   systemPrompt: string,
   contents: GeminiContent[],
   withTools: boolean
@@ -50,9 +55,6 @@ function buildRequestBody(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Convert app ChatMessage history → Gemini contents array
-// ---------------------------------------------------------------------------
 function historyToContents(history: ChatMessage[], userMessage: string): GeminiContent[] {
   const contents: GeminiContent[] = history.map((msg) => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
@@ -62,35 +64,48 @@ function historyToContents(history: ChatMessage[], userMessage: string): GeminiC
   return contents;
 }
 
+function headers() {
+  return {
+    'Content-Type': 'application/json',
+    'X-goog-api-key': process.env.GEMINI_API_KEY ?? '',
+  };
+}
+
 // ---------------------------------------------------------------------------
-// Non-streaming Gemini call (ops dashboard analysis)
+// Non-streaming generateContent
+//
+// Used for every turn in the agentic loop. The non-streaming endpoint returns
+// the COMPLETE response in one JSON object, meaning thoughtSignature (which
+// gemini-flash-latest / gemini-3.5-flash embeds directly on text and
+// functionCall parts) is never split across chunks. We echo the raw part
+// objects verbatim into the conversation history, so the next turn always
+// has intact signatures.
 // ---------------------------------------------------------------------------
 async function callGemini(
   systemPrompt: string,
   contents: GeminiContent[],
-  withTools = false
+  withTools: boolean
 ): Promise<GeminiResponse> {
-  const url = `${GEMINI_BASE}/${MODEL}:generateContent`;
-  const res = await fetch(url, {
+  const res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-goog-api-key': process.env.GEMINI_API_KEY ?? '',
-    },
-    body: JSON.stringify(buildRequestBody(systemPrompt, contents, withTools)),
+    headers: headers(),
+    body: JSON.stringify(buildBody(systemPrompt, contents, withTools)),
   });
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${err}`);
+    throw new Error(`Gemini ${res.status}: ${err}`);
   }
 
   return res.json() as Promise<GeminiResponse>;
 }
 
 // ---------------------------------------------------------------------------
-// Streaming Gemini call — yields SSE text chunks
-// Handles multi-turn function calling transparently.
+// Streaming assistant response
+//
+// All turns use non-streaming generateContent to avoid the thoughtSignature
+// reassembly problem with SSE chunks. The final text is yielded directly
+// from the response — no second streaming call needed.
 // ---------------------------------------------------------------------------
 export async function* streamAssistResponse(
   session: UserSession,
@@ -104,104 +119,43 @@ export async function* streamAssistResponse(
 
   try {
     while (true) {
-      const url = `${GEMINI_BASE}/${MODEL}:streamGenerateContent?alt=sse`;
+      const response = await callGemini(systemPrompt, contents, true);
+      // Use the raw parsed parts — this preserves thoughtSignature and any
+      // other fields Gemini returns without us having to name them all.
+      const parts: GeminiPart[] = response.candidates?.[0]?.content?.parts ?? [];
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-goog-api-key': process.env.GEMINI_API_KEY ?? '',
-        },
-        body: JSON.stringify(buildRequestBody(systemPrompt, contents, true)),
-      });
+      const functionCallParts = parts.filter((p) => p.functionCall);
 
-      if (!res.ok) {
-        const errText = await res.text();
-        yield `\n\nI'm sorry, there was a service error (${res.status}). Please try again.`;
-        console.error('Gemini stream error:', errText);
+      if (functionCallParts.length === 0) {
+        // No more function calls — yield all visible text parts and exit.
+        for (const part of parts) {
+          if (part.text && !part.thought) {
+            yield part.text;
+          }
+        }
         break;
       }
 
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      // Echo the model turn back with ALL raw parts so thoughtSignature
+      // is present for the next request.
+      contents.push({ role: 'model', parts });
 
-      // Accumulated for multi-turn: function calls from this turn
-      const functionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
-      // Accumulated model content parts for appending to conversation
-      const modelParts: GeminiPart[] = [];
-      let turnEnded = false;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const jsonStr = line.slice(6).trim();
-          if (!jsonStr || jsonStr === '[DONE]') continue;
-
-          let chunk: GeminiResponse;
-          try {
-            chunk = JSON.parse(jsonStr) as GeminiResponse;
-          } catch {
-            continue;
-          }
-
-          const candidate = chunk.candidates?.[0];
-          if (!candidate) continue;
-
-          if (candidate.finishReason) turnEnded = true;
-
-          const parts = candidate.content?.parts ?? [];
-          for (const part of parts) {
-            if (part.thought) {
-              // Internal thinking part (Gemini 2.5+): capture with thoughtSignature
-              // but never yield to the user. Must be echoed verbatim in history.
-              modelParts.push(part);
-            } else if (part.text) {
-              yield part.text;
-              modelParts.push({ text: part.text });
-            } else if (part.functionCall) {
-              functionCalls.push({
-                name: part.functionCall.name,
-                args: part.functionCall.args,
-              });
-              modelParts.push({ functionCall: part.functionCall });
-            }
-          }
-        }
-      }
-
-      if (functionCalls.length === 0) break;
-
-      // Append the model turn with function calls
-      contents.push({ role: 'model', parts: modelParts });
-
-      // Execute each function call and build the user turn with responses
+      // Execute every function call and gather results.
       const responseParts: GeminiPart[] = [];
-      for (const fc of functionCalls) {
-        toolsUsed.add(fc.name);
-        const result = await handleToolCall(fc.name, fc.args);
+      for (const part of functionCallParts) {
+        const { name, args } = part.functionCall!;
+        toolsUsed.add(name);
+        const result = await handleToolCall(name, args);
         responseParts.push({
-          functionResponse: {
-            name: fc.name,
-            response: { content: result },
-          },
+          functionResponse: { name, response: { content: result } },
         });
       }
 
       contents.push({ role: 'user', parts: responseParts });
-
-      void turnEnded;
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    yield `\n\nSorry, I encountered a problem: ${msg}. Please try again.`;
+    yield `\n\nSorry, I ran into a problem: ${msg}. Please try again.`;
   }
 
   yield `\n\n[METADATA]${JSON.stringify({ toolsUsed: Array.from(toolsUsed) })}`;
@@ -225,7 +179,7 @@ export async function getOpsAnalysis(
   );
 
   const text = response.candidates?.[0]?.content?.parts
-    ?.filter((p) => p.text)
+    ?.filter((p) => p.text && !p.thought)
     .map((p) => p.text)
     .join('');
 
