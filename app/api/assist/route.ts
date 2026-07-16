@@ -20,14 +20,16 @@ export async function POST(req: NextRequest) {
   const { session, message, history = [] } = body;
 
   // ── Validate API key for the active provider ────────────────────────────
-  const provider = process.env.AI_PROVIDER ?? 'gemini';
-  const missingKey =
-    provider === 'claude'
-      ? !process.env.ANTHROPIC_API_KEY && 'ANTHROPIC_API_KEY'
-      : !process.env.GEMINI_API_KEY && 'GEMINI_API_KEY';
-  if (missingKey) {
+  const provider = process.env.AI_PROVIDER ?? 'groq';
+  const keyMap: Record<string, string> = {
+    groq: 'GROQ_API_KEY',
+    gemini: 'GEMINI_API_KEY',
+    claude: 'ANTHROPIC_API_KEY',
+  };
+  const requiredKey = keyMap[provider] ?? 'GROQ_API_KEY';
+  if (!process.env[requiredKey]) {
     return new Response(
-      JSON.stringify({ error: `${missingKey} is not configured on the server.` }),
+      JSON.stringify({ error: `${requiredKey} is not configured on the server.` }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

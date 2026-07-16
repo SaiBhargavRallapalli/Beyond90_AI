@@ -2,15 +2,14 @@ import type { UserSession, ChatMessage } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
 // AI Provider factory
-// Set AI_PROVIDER=gemini (default) or AI_PROVIDER=claude in your .env.local
+// AI_PROVIDER = 'groq' (default) | 'gemini' | 'claude'
 // ---------------------------------------------------------------------------
-const PROVIDER = (process.env.AI_PROVIDER ?? 'gemini') as 'gemini' | 'claude';
+const PROVIDER = (process.env.AI_PROVIDER ?? 'groq') as 'groq' | 'gemini' | 'claude';
 
 async function getProvider() {
-  if (PROVIDER === 'claude') {
-    return import('@/lib/ai/providers/claude');
-  }
-  return import('@/lib/ai/providers/gemini');
+  if (PROVIDER === 'claude') return import('@/lib/ai/providers/claude');
+  if (PROVIDER === 'gemini') return import('@/lib/ai/providers/gemini');
+  return import('@/lib/ai/providers/groq');
 }
 
 export async function* streamAssistResponse(
