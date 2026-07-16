@@ -287,44 +287,52 @@ export default function FanPage() {
 
         if (!reader) throw new Error('No response body');
 
-        let buffer = '';
-        let accumulatedText = '';
+        // The API streams raw text chunks (not SSE-formatted).
+        // We accumulate everything and strip the [METADATA] sentinel
+        // before displaying, updating the UI on every incoming chunk.
+        const META_MARKER = '\n\n[METADATA]';
+        let accumulated = '';
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
+          accumulated += decoder.decode(value, { stream: true });
 
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') continue;
+          const metaIdx = accumulated.indexOf(META_MARKER);
+          const displayText = metaIdx >= 0
+            ? accumulated.slice(0, metaIdx)
+            : accumulated;
 
-            if (data.startsWith('[METADATA]')) {
-              try {
-                const metaStr = data.slice(10);
-                const meta = JSON.parse(metaStr);
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId
-                      ? { ...m, metadata: { ...m.metadata, toolsUsed: meta.toolsUsed ?? [], crowdAlert: meta.crowdWarning ? { level: 'high', message: meta.crowdWarning } : undefined } }
-                      : m
-                  )
-                );
-              } catch {}
-              continue;
-            }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: displayText } : m
+            )
+          );
 
-            accumulatedText += data;
-            const snapshot = accumulatedText;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, content: snapshot } : m
-              )
-            );
+          if (metaIdx >= 0) {
+            try {
+              const meta = JSON.parse(accumulated.slice(metaIdx + META_MARKER.length)) as {
+                toolsUsed?: string[];
+                crowdWarning?: string;
+              };
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        metadata: {
+                          ...m.metadata,
+                          toolsUsed: meta.toolsUsed ?? [],
+                          crowdAlert: meta.crowdWarning
+                            ? { level: 'high', message: meta.crowdWarning }
+                            : undefined,
+                        },
+                      }
+                    : m
+                )
+              );
+            } catch { /* incomplete JSON — will resolve on next chunk */ }
           }
         }
       } catch (err: unknown) {
