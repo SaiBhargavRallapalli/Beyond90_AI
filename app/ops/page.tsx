@@ -547,7 +547,7 @@ export default function OpsPage() {
               <h2 className="text-sm font-bold text-white">AI Ops Advisor</h2>
               <div className="flex items-center gap-1.5 ml-auto">
                 <span className="pulse-live" />
-                <span className="text-xs text-emerald-400 font-medium">Claude AI</span>
+                <span className="text-xs text-emerald-400 font-medium">Beyond90 AI</span>
               </div>
             </div>
 
@@ -593,7 +593,7 @@ export default function OpsPage() {
                               />
                             ))}
                           </div>
-                          Analyzing with Claude AI...
+                          Analyzing with AI...
                         </div>
                       ) : (
                         m.response
@@ -684,7 +684,7 @@ export default function OpsPage() {
 
       <footer className="border-t border-primary-800/30 py-4 px-4 text-center">
         <p className="text-xs text-primary-600">
-          Beyond90 AI Ops Center &bull; {venueLabel} &bull; Powered by Claude AI &bull; Data refreshes every 30s
+          Beyond90 AI Ops Center &bull; {venueLabel} &bull; Powered by Beyond90 AI &bull; Data refreshes every 30s
         </p>
       </footer>
     </div>

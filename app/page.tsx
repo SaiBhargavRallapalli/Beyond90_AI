@@ -64,7 +64,7 @@ const FEATURES = [
     emoji: '🌍',
     title: 'Multilingual AI',
     description:
-      'Claude AI responds fluently in 10+ languages: English, Spanish, French, Portuguese, Arabic, German, Japanese, Korean, Italian, and Dutch.',
+      'Beyond90 AI responds fluently in 10+ languages: English, Spanish, French, Portuguese, Arabic, German, Japanese, Korean, Italian, and Dutch.',
     color: 'from-blue-500/15 to-blue-600/5',
     border: 'border-blue-500/20',
     iconColor: 'text-blue-400',
@@ -106,7 +106,7 @@ const HOW_IT_WORKS = [
     icon: <MessageSquare size={32} />,
     title: 'Ask',
     description:
-      'Ask anything in your language. "Where is the nearest accessible restroom?" or "How crowded is Gate C right now?" — Claude answers instantly.',
+      'Ask anything in your language. "Where is the nearest accessible restroom?" or "How crowded is Gate C right now?" — Beyond90 AI answers instantly.',
     color: 'text-accent-400',
     border: 'border-accent-500/30',
   },
@@ -245,7 +245,7 @@ export default function HomePage() {
         <div className="relative max-w-5xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-accent-500/25 bg-accent-500/8 text-accent-300 text-xs font-semibold mb-8 backdrop-blur-sm">
             <span className="pulse-live" />
-            FIFA World Cup 2026 &bull; 8 Venues &bull; Powered by Claude AI
+            FIFA World Cup 2026 &bull; 8 Venues &bull; GenAI Powered
           </div>
 
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.05] tracking-tight mb-6">
@@ -452,7 +452,7 @@ export default function HomePage() {
             <div className="flex flex-col items-center md:items-end gap-2">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5">
                 <span className="pulse-live" />
-                <span className="text-xs font-semibold text-emerald-400">Powered by Claude AI</span>
+                <span className="text-xs font-semibold text-emerald-400">GenAI Powered</span>
               </div>
               <p className="text-xs text-primary-500">&copy; 2026 Beyond90 AI. All rights reserved.</p>
             </div>

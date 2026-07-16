@@ -603,7 +603,7 @@ export default function FanPage() {
                 </div>
                 <div className="mt-8 flex items-center gap-2 text-xs text-primary-500">
                   <span className="pulse-live" />
-                  Powered by Claude AI &bull; Responds in {LANGUAGES.find((l) => l.code === language)?.label ?? 'English'}
+                  Powered by Beyond90 AI &bull; Responds in {LANGUAGES.find((l) => l.code === language)?.label ?? 'English'}
                 </div>
               </div>
             )}
@@ -657,7 +657,7 @@ export default function FanPage() {
               </button>
             </div>
             <p className="text-center text-xs text-primary-600 mt-2">
-              Beyond90 AI &bull; {venueLabel} &bull; Powered by Claude
+              Beyond90 AI &bull; {venueLabel} &bull; GenAI Powered
             </p>
           </div>
         </main>
