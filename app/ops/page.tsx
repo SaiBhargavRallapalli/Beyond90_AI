@@ -267,7 +267,7 @@ export default function OpsPage() {
         setAdvisorMessages((prev) =>
           prev.map((m, i) =>
             i === prev.length - 1
-              ? { ...m, response: data.response ?? 'No response received.', loading: false }
+              ? { ...m, response: data.analysis ?? data.response ?? 'No response received.', loading: false }
               : m
           )
         );

@@ -33,9 +33,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const provider = process.env.AI_PROVIDER ?? 'groq';
+  const keyMap: Record<string, string> = { groq: 'GROQ_API_KEY', gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY' };
+  const requiredKey = keyMap[provider] ?? 'GROQ_API_KEY';
+  if (!process.env[requiredKey]) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY is not configured on the server.' },
+      { error: `${requiredKey} is not configured on the server.` },
       { status: 500 }
     );
   }
