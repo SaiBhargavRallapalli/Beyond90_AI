@@ -64,7 +64,9 @@ export async function POST(req: NextRequest) {
 
   const venue = VENUES[venueId as VenueId];
   const forecast = generateCrowdForecast(venue, minutesToKickoff);
-  const activeAlerts = forecast.hotspots.length + 2; // crowd alerts + baseline infra alerts
+  // Hotspot alerts (dynamic) + 2 static infra alerts always present (waste station + transport hub)
+  const STATIC_INFRA_ALERTS = 2;
+  const activeAlerts = forecast.hotspots.length + STATIC_INFRA_ALERTS;
 
   try {
     const analysis = await getOpsAnalysis(

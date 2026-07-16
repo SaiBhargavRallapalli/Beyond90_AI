@@ -32,6 +32,12 @@ async function getProvider() {
   return import('@/lib/ai/providers/groq');
 }
 
+/**
+ * Stream a fan assistant response token-by-token from the active AI provider.
+ *
+ * Yields raw text chunks followed by a `[METADATA]{...}` sentinel containing
+ * toolsUsed, provider, and model. Falls back to MockLLM when no API key is set.
+ */
 export async function* streamAssistResponse(
   session: UserSession,
   message: string,
@@ -41,6 +47,12 @@ export async function* streamAssistResponse(
   yield* provider.streamAssistResponse(session, message, history);
 }
 
+/**
+ * Generate a structured operational analysis for a venue's current state.
+ *
+ * Returns a markdown-formatted string with prioritized recommendations.
+ * Falls back to MockLLM when no API key is configured for the active provider.
+ */
 export async function getOpsAnalysis(
   venueName: string,
   minutesToKickoff: number,

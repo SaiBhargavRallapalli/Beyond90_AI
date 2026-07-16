@@ -180,6 +180,17 @@ function classifyNode(nodeId: string): NodeClassification {
   return 'concourse';
 }
 
+/**
+ * Compute a per-node crowd forecast for the given venue and match timing.
+ *
+ * Each node's occupancy, inflow, outflow, congestion index, and trend are
+ * derived from the continuous sigmoid flow model in `computeOccupancy` /
+ * `computeInflow` / `computeOutflow`. Hotspots are nodes with congestion
+ * index > 70; safe nodes have occupancy < 40%.
+ *
+ * @param graph - The venue graph (nodes, edges, capacity)
+ * @param minutesToKickoff - Minutes until kickoff (positive = pre-match, negative = in-match / post)
+ */
 export function generateCrowdForecast(
   graph: VenueGraph,
   minutesToKickoff: number
@@ -220,6 +231,10 @@ export function generateCrowdForecast(
   };
 }
 
+/**
+ * Map a fractional occupancy value (0–1) to a named crowd level.
+ * Thresholds: low < 0.40, moderate < 0.65, high < 0.85, critical ≥ 0.85.
+ */
 export function getCrowdLevel(occupancy: number): 'low' | 'moderate' | 'high' | 'critical' {
   if (occupancy < 0.40) return 'low';
   if (occupancy < 0.65) return 'moderate';
@@ -227,6 +242,7 @@ export function getCrowdLevel(occupancy: number): 'low' | 'moderate' | 'high' | 
   return 'critical';
 }
 
+/** Return the hex colour associated with a crowd level for UI rendering. */
 export function crowdLevelColor(level: ReturnType<typeof getCrowdLevel>): string {
   switch (level) {
     case 'low':      return '#00D4AA';
@@ -236,6 +252,15 @@ export function crowdLevelColor(level: ReturnType<typeof getCrowdLevel>): string
   }
 }
 
+/**
+ * Estimate queue wait time (in minutes) at a node given its occupancy and throughput.
+ *
+ * Returns 0 when occupancy is below 50% (no meaningful queue).
+ * Above 50%, wait grows linearly with overflow relative to throughput.
+ *
+ * @param occupancy - Fractional occupancy (0–1)
+ * @param nodeCapacityPerMinute - Fan throughput capacity in fans/minute
+ */
 export function estimateWaitMinutes(occupancy: number, nodeCapacityPerMinute: number): number {
   if (occupancy < 0.5) return 0;
   const overflow = Math.max(0, occupancy - 0.5);

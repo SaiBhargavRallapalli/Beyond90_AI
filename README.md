@@ -13,7 +13,19 @@ Beyond90 AI is a GenAI-powered platform for the FIFA World Cup 2026, delivering 
 
 **[Challenge 4] Smart Stadiums & Tournament Operations**
 
-Beyond90 AI addresses every dimension of the challenge brief: navigation, crowd management, accessibility, transportation, sustainability, multilingual assistance, operational intelligence, and real-time decision support.
+Beyond90 AI addresses every dimension of the challenge brief:
+
+| Challenge Dimension | Beyond90 Implementation |
+|---|---|
+| **Navigation** | A* pathfinding on 2D venue graph with live crowd-aware routing; step-by-step directions for any seat, gate, or facility |
+| **Crowd Management** | Continuous sigmoid flow model per node type; congestion index (0–100); automated hotspot detection and recommended actions |
+| **Accessibility** | Step-free routing mode; ADA facilities surfaced first; WCAG 2.1 AA compliance across all pages; sensory room and companion care awareness |
+| **Transportation** | Post-match transport options, shuttle queue estimates, rideshare staging, and accessible coach boarding — for every venue |
+| **Sustainability** | Per-venue sustainability score; real-time recycling rate, renewable energy %, water station capacity, and carbon-per-fan tracking |
+| **Multilingual Assistance** | LLM responds natively in 10+ languages (Arabic, Spanish, French, Portuguese, German, Japanese, Mandarin, Hindi, and more) |
+| **Operational Intelligence** | AI Ops Advisor integrates crowd forecast, active alerts, and sustainability state to generate prioritized staff recommendations |
+| **Real-time Decision Support** | Live SVG heatmap + automated alert engine; 429-capped AI endpoints with Retry-After; all responses ≤ 30 s |
+| **Volunteer / Staff Coordination** | Role-aware assistant (Fan, Staff, Volunteer, Media) with distinct context; staff deployment overview on Ops dashboard |
 
 ---
 
@@ -95,7 +107,7 @@ For providers that don't support function calling reliably, venue data, crowd sn
 | Pathfinding | A* algorithm on 2D venue coordinate graph |
 | Crowd Model | Continuous sigmoid flow model (6 node types, 3 match phases) |
 | Styling | Tailwind CSS (dark theme, design tokens) |
-| Testing | Vitest — 301 tests across 5 test suites |
+| Testing | Vitest — 334 tests across 7 test suites |
 | Accessibility | WCAG 2.1 AA — skip nav, aria-live, focus-visible, reduced-motion |
 | Deployment | Google Cloud Run |
 
@@ -103,7 +115,7 @@ For providers that don't support function calling reliably, venue data, crowd sn
 
 ## Testing
 
-301 tests across 5 suites — all passing.
+334 tests across 7 suites — all passing.
 
 ```bash
 npm test              # run all tests
@@ -117,6 +129,8 @@ npm run test:coverage # run with coverage report
 | `validation.test.ts` | 28 | VenueId, query strings, minutesToKickoff, roles, profiles, prompt injection sanitization |
 | `data.test.ts` | 73 | All 8 venues: capacity ranges, node/edge/facility integrity, step-free coverage |
 | `accessibility.test.ts` | 22 | Skip link, aria-labels, heading hierarchy, form label association, SVG, table caption, aria-live |
+| `rateLimit.test.ts` | 22 | Allow/deny logic, retryAfter semantics, LRU eviction, cross-IP / cross-tier isolation |
+| `mock.test.ts` | 130 | MockLLM streaming output, METADATA sentinel, all 7 fan categories, all 4 ops categories |
 
 ---
 
@@ -190,28 +204,30 @@ Switching AI providers requires only changing `AI_PROVIDER` — no code changes.
 ```
 beyond90-ai/
 ├── app/
-│   ├── page.tsx                 # Landing page
+│   ├── page.tsx                 # Landing page — venue picker, role entry points
 │   ├── layout.tsx               # Root layout — skip link, <main>, WCAG baseline
 │   ├── globals.css              # Design tokens, skip-link, focus-visible, reduced-motion
-│   ├── fan/page.tsx             # Fan Hub (streaming chat, sidebar session config)
-│   ├── ops/page.tsx             # Operations Center dashboard
+│   ├── fan/page.tsx             # Fan Hub — streaming chat, sidebar session config
+│   ├── ops/page.tsx             # Operations Center — heatmap, alert engine, AI advisor
 │   └── api/
-│       ├── assist/route.ts      # Streaming AI endpoint (raw text chunks)
-│       ├── crowd/route.ts       # Crowd intelligence API
-│       ├── ops/route.ts         # Ops snapshot (GET) + AI advisor (POST)
+│       ├── assist/route.ts      # Streaming AI endpoint — raw text chunks + METADATA sentinel
+│       ├── crowd/route.ts       # Crowd intelligence API — forecast snapshots per venue
+│       ├── ops/route.ts         # Ops snapshot (GET) + AI ops advisor (POST)
 │       └── venues/route.ts      # Venue graph data API
 ├── lib/
 │   ├── ai/
-│   │   ├── client.ts            # Provider factory (AI_PROVIDER flag)
-│   │   ├── context.ts           # Venue context builder (injected into system prompt)
+│   │   ├── client.ts            # Provider factory — AI_PROVIDER flag + MockLLM fallback
+│   │   ├── context.ts           # Venue context builder — injected into Groq/Gemini system prompt
 │   │   └── providers/
 │   │       ├── groq.ts          # Groq — OpenAI-compatible, SSE streaming
 │   │       ├── gemini.ts        # Gemini — context injection, no function calling
-│   │       └── claude.ts        # Claude — 6 tools, multi-turn tool use, SSE
+│   │       ├── claude.ts        # Claude — 6 tools, multi-turn tool use, SSE
+│   │       └── mock.ts          # MockLLM — offline fallback, keyword-matched templates
 │   ├── venues/
 │   │   ├── data.ts              # All 8 WC2026 venue graphs (nodes, edges, facilities)
 │   │   ├── graph.ts             # A* pathfinding + nearestFacilityNode (BFS)
 │   │   └── crowd.ts             # Sigmoid crowd flow model + congestion index
+│   ├── rateLimit.ts             # Sliding-window rate limiter — LRU eviction, ai/data tiers
 │   └── types.ts                 # Shared TypeScript types
 ├── components/
 │   ├── fan/MessageBubble.tsx
@@ -223,7 +239,9 @@ beyond90-ai/
     ├── graph.test.ts            # 22 tests — A* pathfinding correctness
     ├── validation.test.ts       # 28 tests — input validation & sanitization
     ├── data.test.ts             # 73 tests — all 8 venue graph integrity
-    └── accessibility.test.ts   # 22 tests — WCAG structure assertions
+    ├── accessibility.test.ts   # 22 tests — WCAG structure assertions
+    ├── rateLimit.test.ts        # 22 tests — rate limiter allow/deny, LRU eviction
+    └── mock.test.ts             # 130 tests — MockLLM streaming, METADATA, all categories
 ```
 
 ### How the AI Responds (Claude path)

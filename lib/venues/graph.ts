@@ -52,6 +52,12 @@ function determineCrowdRisk(
   return 'medium';
 }
 
+/**
+ * Build an adjacency list from the venue's edge array.
+ *
+ * Bidirectional edges are added in both directions. The result is a Map from
+ * node ID to an array of `{ edge, targetId }` pairs used by A* and BFS.
+ */
 export function buildAdjacency(
   graph: VenueGraph
 ): Map<string, Array<{ edge: NavEdge; targetId: string }>> {
@@ -134,6 +140,20 @@ function reconstructRoute(
   };
 }
 
+/**
+ * Find the optimal route between two nodes using A* with a Euclidean heuristic.
+ *
+ * A* is preferred over Dijkstra here because the 2D coordinate system provides
+ * an admissible, consistent heuristic that prunes the search space significantly
+ * on large venue graphs.
+ *
+ * @param graph - The venue graph to search
+ * @param fromNodeId - Starting node ID
+ * @param toNodeId - Destination node ID
+ * @param options.stepFreeOnly - When true, only traverses step-free edges
+ * @param options.avoidNodes - Node IDs to exclude from the search (e.g. hotspots)
+ * @returns A `NavigationRoute` with step-by-step segments, or `null` if unreachable
+ */
 export function findRoute(
   graph: VenueGraph,
   fromNodeId: string,
@@ -232,6 +252,18 @@ export function findRoute(
   return null;
 }
 
+/**
+ * Locate the nearest facility of a given type using breadth-first Dijkstra search.
+ *
+ * BFS over the weighted graph terminates as soon as a candidate facility node is
+ * de-queued and no closer candidate can exist (distance pruning). Returns the
+ * closest matching facility by walking distance, or `null` if none is reachable.
+ *
+ * @param graph - The venue graph to search
+ * @param fromNodeId - Starting node ID
+ * @param facilityTypes - Facility type identifiers to match (e.g. `['accessible_restroom']`)
+ * @param accessibleOnly - When true, only considers facilities flagged as accessible
+ */
 export function nearestFacilityNode(
   graph: VenueGraph,
   fromNodeId: string,
