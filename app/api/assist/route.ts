@@ -1,11 +1,32 @@
 import { NextRequest } from 'next/server';
 import { streamAssistResponse } from '@/lib/ai/client';
+import { checkRateLimit } from '@/lib/rateLimit';
 import type { UserSession, ChatMessage } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  // ── Rate limiting ────────────────────────────────────────────────────────
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? req.headers.get('x-real-ip')
+    ?? '127.0.0.1';
+  const rl = checkRateLimit(ip, 'ai');
+  if (!rl.allowed) {
+    return new Response(
+      JSON.stringify({ error: 'Too many requests. Please wait before sending another message.' }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(rl.retryAfter),
+          'X-RateLimit-Limit': '20',
+          'X-RateLimit-Window': '60',
+        },
+      }
+    );
+  }
+
   // ── Parse body ──────────────────────────────────────────────────────────
   let body: { session?: UserSession; message?: string; history?: ChatMessage[] };
   try {
@@ -19,22 +40,8 @@ export async function POST(req: NextRequest) {
 
   const { session, message, history = [] } = body;
 
-  // ── Validate API key for the active provider ────────────────────────────
-  const provider = process.env.AI_PROVIDER ?? 'groq';
-  const keyMap: Record<string, string> = {
-    groq: 'GROQ_API_KEY',
-    gemini: 'GEMINI_API_KEY',
-    claude: 'ANTHROPIC_API_KEY',
-  };
-  const requiredKey = keyMap[provider] ?? 'GROQ_API_KEY';
-  if (!process.env[requiredKey]) {
-    return new Response(
-      JSON.stringify({ error: `${requiredKey} is not configured on the server.` }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-
   // ── Validate session fields ──────────────────────────────────────────────
+  // No API key check here — client.ts falls back to MockLLM when no key is set
   if (!session?.venueId || !session?.role || !session?.id) {
     return new Response(
       JSON.stringify({ error: 'Missing required session fields: venueId, role, id.' }),

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOpsAnalysis } from '@/lib/ai/client';
 import { generateCrowdForecast } from '@/lib/venues/crowd';
 import { VENUES } from '@/lib/venues/data';
+import { checkRateLimit } from '@/lib/rateLimit';
 import type { VenueId, OpsSnapshot, OperationalAlert, CrowdForecast } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -12,6 +13,25 @@ export const maxDuration = 30;
 // Accepts { venueId, minutesToKickoff, query } and returns an AI ops analysis.
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
+  // ── Rate limiting ──────────────────────────────────────────────────────
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? req.headers.get('x-real-ip')
+    ?? '127.0.0.1';
+  const rl = checkRateLimit(ip, 'ai');
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait before querying the AI advisor.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rl.retryAfter),
+          'X-RateLimit-Limit': '20',
+          'X-RateLimit-Window': '60',
+        },
+      }
+    );
+  }
+
   let body: { venueId?: string; minutesToKickoff?: number; query?: string };
   try {
     body = (await req.json()) as typeof body;
@@ -33,15 +53,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const provider = process.env.AI_PROVIDER ?? 'groq';
-  const keyMap: Record<string, string> = { groq: 'GROQ_API_KEY', gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY' };
-  const requiredKey = keyMap[provider] ?? 'GROQ_API_KEY';
-  if (!process.env[requiredKey]) {
-    return NextResponse.json(
-      { error: `${requiredKey} is not configured on the server.` },
-      { status: 500 }
-    );
-  }
+  // No API key check here — client.ts falls back to MockLLM when no key is set
 
   if (!query || typeof query !== 'string' || query.trim().length === 0) {
     return NextResponse.json(
