@@ -294,24 +294,28 @@ export default function OpsPage() {
   const venueLabel = VENUES.find((v) => v.id === venueId)?.name ?? '';
 
   return (
-    <div className="min-h-screen bg-primary-950 text-primary-100">
+    <div className="min-h-screen bg-primary-950 text-primary-100" role="region" aria-label="Operations Center dashboard">
       <header className="sticky top-0 z-30 border-b border-primary-800/50 glass-dark">
         <div className="flex items-center gap-3 px-4 h-14">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center">
-              <span className="text-primary-900 font-black text-xs">B9</span>
-            </div>
-            <Home size={14} className="text-primary-400" />
-          </Link>
-          <div className="h-4 w-px bg-primary-700" />
-          <BarChart3 size={16} className="text-accent-400" />
-          <span className="text-sm font-bold text-white">Operations Center</span>
+          <nav aria-label="Site navigation" className="flex items-center gap-2">
+            <Link href="/" aria-label="Beyond90 AI home" className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center" aria-hidden="true">
+                <span className="text-primary-900 font-black text-xs">B9</span>
+              </div>
+              <Home size={14} className="text-primary-400" aria-hidden="true" />
+            </Link>
+          </nav>
+          <div className="h-4 w-px bg-primary-700" aria-hidden="true" />
+          <BarChart3 size={16} className="text-accent-400" aria-hidden="true" />
+          <h1 className="text-sm font-bold text-white">Operations Center</h1>
 
           <div className="flex-1" />
 
           <div className="flex items-center gap-3">
             <div className="relative">
+              <label htmlFor="select-ops-venue" className="sr-only">Select venue</label>
               <select
+                id="select-ops-venue"
                 value={venueId}
                 onChange={(e) => setVenueId(e.target.value as VenueId)}
                 className="text-xs px-3 py-1.5 pr-7 rounded-lg appearance-none bg-primary-800/60 border border-primary-700/40"
@@ -320,7 +324,7 @@ export default function OpsPage() {
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
               </select>
-              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-primary-400" />
+              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-primary-400" aria-hidden="true" />
             </div>
 
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold ${minutesToKickoff <= 0 ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : 'border-accent-500/30 text-accent-400 bg-accent-500/10'}`}>
@@ -340,10 +344,12 @@ export default function OpsPage() {
               </div>
             )}
 
-            <Link href="/fan">
-              <button className="text-xs text-primary-400 hover:text-white border border-primary-700/40 rounded-lg px-3 py-1.5 transition-colors">
-                Fan Hub
-              </button>
+            <Link
+              href="/fan"
+              aria-label="Go to Fan Hub"
+              className="text-xs text-primary-400 hover:text-white border border-primary-700/40 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              Fan Hub
             </Link>
           </div>
         </div>
@@ -401,9 +407,12 @@ export default function OpsPage() {
             <div className="relative w-full" style={{ paddingBottom: '70%' }}>
               <svg
                 viewBox="0 0 100 100"
+                role="img"
+                aria-label="Stadium crowd density heatmap showing congestion levels across venue zones"
                 className="absolute inset-0 w-full h-full"
                 style={{ background: 'rgba(10,22,40,0.4)', borderRadius: '12px' }}
               >
+                <title>Stadium crowd density heatmap</title>
                 <ellipse cx="50" cy="50" rx="46" ry="42" fill="none" stroke="rgba(138,155,181,0.15)" strokeWidth="0.5" />
                 <ellipse cx="50" cy="50" rx="36" ry="32" fill="none" stroke="rgba(138,155,181,0.1)" strokeWidth="0.4" />
                 <rect x="28" y="34" width="44" height="32" rx="2" fill="rgba(0,212,170,0.04)" stroke="rgba(0,212,170,0.15)" strokeWidth="0.4" />
@@ -416,7 +425,14 @@ export default function OpsPage() {
                   const isHovered = hoveredNode === node.id;
                   const radius = isHovered ? 4 : 2.8;
                   return (
-                    <g key={node.id}>
+                    <g
+                      key={node.id}
+                      role="img"
+                      aria-label={`${node.label}: ${Math.round(node.congestion * 100)}% congested`}
+                      tabIndex={0}
+                      onFocus={() => setHoveredNode(node.id)}
+                      onBlur={() => setHoveredNode(null)}
+                    >
                       <circle
                         cx={node.x}
                         cy={node.y}
@@ -563,7 +579,12 @@ export default function OpsPage() {
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-4 min-h-[200px] max-h-[280px] mb-4">
+            <div
+              className="flex-1 overflow-y-auto space-y-4 min-h-[200px] max-h-[280px] mb-4"
+              aria-live="polite"
+              aria-label="AI advisor responses"
+              role="log"
+            >
               {advisorMessages.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-center py-8">
                   <BarChart3 size={28} className="text-primary-600 mb-2" />
@@ -606,7 +627,9 @@ export default function OpsPage() {
             </div>
 
             <div className="flex gap-2">
+              <label htmlFor="ops-advisor-input" className="sr-only">Ask the operations AI advisor</label>
               <input
+                id="ops-advisor-input"
                 type="text"
                 value={advisorInput}
                 onChange={(e) => setAdvisorInput(e.target.value)}
@@ -617,9 +640,10 @@ export default function OpsPage() {
               <button
                 onClick={() => sendOpsQuery(advisorInput)}
                 disabled={!advisorInput.trim()}
+                aria-label="Send ops query"
                 className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center text-primary-900 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Send size={14} />
+                <Send size={14} aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -635,6 +659,7 @@ export default function OpsPage() {
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
+                <caption className="sr-only">Staff resources — name, role, location, and status for deployed personnel</caption>
                 <thead>
                   <tr className="border-b border-primary-800/60">
                     <th className="text-left text-primary-400 font-semibold py-2 pr-3 uppercase tracking-wider text-xs">Name</th>

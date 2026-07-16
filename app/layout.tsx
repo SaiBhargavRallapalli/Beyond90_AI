@@ -43,7 +43,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`dark ${inter.variable}`}>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <main id="main" aria-label="Main content">{children}</main>
+      </body>
     </html>
   );
 }

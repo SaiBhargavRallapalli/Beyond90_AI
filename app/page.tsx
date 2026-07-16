@@ -194,7 +194,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen gradient-hero text-primary-50">
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary-700/40 glass-dark">
+      <nav aria-label="Primary navigation" className="fixed top-0 left-0 right-0 z-50 border-b border-primary-700/40 glass-dark">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center shadow-lg">
@@ -227,10 +227,8 @@ export default function HomePage() {
             </a>
           </div>
 
-          <Link href="/fan">
-            <button className="btn-primary text-sm">
-              Get Started <ArrowRight size={14} className="inline ml-1" />
-            </button>
+          <Link href="/fan" className="btn-primary text-sm">
+            Get Started <ArrowRight size={14} className="inline ml-1" aria-hidden="true" />
           </Link>
         </div>
       </nav>
@@ -262,17 +260,13 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <Link href="/fan">
-              <button className="btn-primary flex items-center gap-2 text-base px-8 py-3.5">
-                ⚽ Enter Fan Hub
-                <ChevronRight size={18} />
-              </button>
+            <Link href="/fan" className="btn-primary flex items-center gap-2 text-base px-8 py-3.5">
+              <span aria-hidden="true">⚽</span> Enter Fan Hub
+              <ChevronRight size={18} aria-hidden="true" />
             </Link>
-            <Link href="/ops">
-              <button className="btn-outline flex items-center gap-2 text-base px-8 py-3.5">
-                📡 Ops Center
-                <ChevronRight size={18} />
-              </button>
+            <Link href="/ops" className="btn-outline flex items-center gap-2 text-base px-8 py-3.5">
+              <span aria-hidden="true">📡</span> Ops Center
+              <ChevronRight size={18} aria-hidden="true" />
             </Link>
           </div>
 
@@ -338,6 +332,9 @@ export default function HomePage() {
             {VENUES.map((venue, i) => (
               <div
                 key={venue.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`View ${venue.name} details`}
                 className="flex-shrink-0 w-64 snap-start glass rounded-2xl p-5 card-hover border border-primary-700/30 cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-4">
@@ -415,16 +412,12 @@ export default function HomePage() {
               Experience the future of stadium intelligence. Ask anything, navigate anywhere, in any language.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/fan">
-                <button className="btn-primary flex items-center gap-2 text-base px-10 py-4">
-                  🤖 Try Fan Hub
-                  <ArrowRight size={18} />
-                </button>
+              <Link href="/fan" className="btn-primary flex items-center gap-2 text-base px-10 py-4">
+                <span aria-hidden="true">🤖</span> Try Fan Hub
+                <ArrowRight size={18} aria-hidden="true" />
               </Link>
-              <Link href="/ops">
-                <button className="btn-outline flex items-center gap-2 text-base px-10 py-4">
-                  📊 Ops Dashboard
-                </button>
+              <Link href="/ops" className="btn-outline flex items-center gap-2 text-base px-10 py-4">
+                <span aria-hidden="true">📊</span> Ops Dashboard
               </Link>
             </div>
           </div>

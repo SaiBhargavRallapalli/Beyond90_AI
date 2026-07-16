@@ -217,3 +217,44 @@ option {
   background-color: #0D1B3E;
   color: var(--color-text);
 }
+
+/* ── Skip navigation link (visually hidden until focused) ──────────────────── */
+/* Contrast: white text on #0A1628 background ≈ 15:1 — WCAG AAA */
+.skip-link {
+  position: absolute;
+  top: -999px;
+  left: 0;
+  z-index: 9999;
+  padding: 0.5rem 1.25rem;
+  background: #0A1628;
+  color: #E8EDF5;
+  font-weight: 700;
+  font-size: 0.875rem;
+  text-decoration: none;
+  border-bottom-right-radius: 6px;
+}
+
+.skip-link:focus-visible {
+  top: 0;
+  outline: 3px solid #C9A84C;
+  outline-offset: 2px;
+}
+
+/* ── Keyboard focus visible (WCAG 2.4.11) ──────────────────────────────────── */
+/* Contrast of focus ring on dark background > 3:1 */
+:focus-visible {
+  outline: 3px solid #C9A84C;
+  outline-offset: 2px;
+}
+
+/* ── Reduced motion (WCAG 2.3.3 — AAA, good practice) ─────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

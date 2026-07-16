@@ -370,37 +370,46 @@ export default function FanPage() {
   return (
     <div className="h-screen flex flex-col bg-primary-950 text-primary-100">
       <header className="flex-shrink-0 h-14 border-b border-primary-800/50 glass-dark flex items-center px-4 gap-3 z-20">
-        <Link href="/" className="flex items-center gap-2 mr-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center">
-            <span className="text-primary-900 font-black text-xs">B9</span>
-          </div>
-          <span className="text-white font-bold text-sm hidden sm:block">Beyond90 AI</span>
-        </Link>
-        <div className="h-4 w-px bg-primary-700" />
-        <div className="flex items-center gap-2">
-          <span className="pulse-live" />
-          <span className="text-xs font-semibold text-emerald-400">Live</span>
-        </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-2">
-          <CrowdBadge level={crowdLevel} size="sm" />
-          <Link href="/ops">
-            <button className="flex items-center gap-1.5 text-xs text-primary-400 hover:text-white border border-primary-700/50 rounded-lg px-3 py-1.5 transition-colors">
-              <LayoutDashboard size={13} />
-              <span className="hidden sm:block">Ops Center</span>
-            </button>
+        <nav aria-label="Site navigation" className="flex items-center gap-3 flex-1">
+          <Link href="/" aria-label="Beyond90 AI home" className="flex items-center gap-2 mr-2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center" aria-hidden="true">
+              <span className="text-primary-900 font-black text-xs">B9</span>
+            </div>
+            <span className="text-white font-bold text-sm hidden sm:block">Beyond90 AI</span>
           </Link>
-          <button
-            onClick={() => setSidebarOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-xs text-primary-400 hover:text-white border border-primary-700/50 rounded-lg px-3 py-1.5 transition-colors md:hidden"
-          >
-            <Settings2 size={13} />
-          </button>
-        </div>
+          <div className="h-4 w-px bg-primary-700" aria-hidden="true" />
+          <div className="flex items-center gap-2" aria-label="Live status" role="status">
+            <span className="pulse-live" aria-hidden="true" />
+            <span className="text-xs font-semibold text-emerald-400">Live</span>
+          </div>
+          <div className="flex-1" />
+          <div className="flex items-center gap-2">
+            <CrowdBadge level={crowdLevel} size="sm" />
+            <Link
+              href="/ops"
+              aria-label="Go to Operations Center"
+              className="flex items-center gap-1.5 text-xs text-primary-400 hover:text-white border border-primary-700/50 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <LayoutDashboard size={13} aria-hidden="true" />
+              <span className="hidden sm:block">Ops Center</span>
+            </Link>
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              aria-label={sidebarOpen ? 'Close session settings' : 'Open session settings'}
+              aria-expanded={sidebarOpen}
+              aria-controls="session-sidebar"
+              className="flex items-center gap-1.5 text-xs text-primary-400 hover:text-white border border-primary-700/50 rounded-lg px-3 py-1.5 transition-colors md:hidden"
+            >
+              <Settings2 size={13} aria-hidden="true" />
+            </button>
+          </div>
+        </nav>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         <aside
+          id="session-sidebar"
+          aria-label="Session settings"
           className={`${sidebarOpen ? 'w-72 min-w-[18rem]' : 'w-0 min-w-0 overflow-hidden'} flex-shrink-0 border-r border-primary-800/40 bg-primary-950/80 flex flex-col transition-all duration-300 md:w-72 md:min-w-[18rem] md:overflow-visible`}
         >
           <div className="flex-1 overflow-y-auto p-4 space-y-5">
@@ -412,10 +421,11 @@ export default function FanPage() {
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <MapPin size={11} /> Venue
+                  <label htmlFor="select-venue" className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <MapPin size={11} aria-hidden="true" /> Venue
                   </label>
                   <select
+                    id="select-venue"
                     value={venueId}
                     onChange={(e) => setVenueId(e.target.value as VenueId)}
                     className="w-full text-sm px-3 py-2 rounded-lg"
@@ -427,10 +437,11 @@ export default function FanPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <MapPin size={11} /> My Location
+                  <label htmlFor="select-location" className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <MapPin size={11} aria-hidden="true" /> My Location
                   </label>
                   <select
+                    id="select-location"
                     value={currentNodeId}
                     onChange={(e) => setCurrentNodeId(e.target.value)}
                     className="w-full text-sm px-3 py-2 rounded-lg"
@@ -442,10 +453,11 @@ export default function FanPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <Users size={11} /> Role
+                  <label htmlFor="select-role" className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <Users size={11} aria-hidden="true" /> Role
                   </label>
                   <select
+                    id="select-role"
                     value={role}
                     onChange={(e) => setRole(e.target.value as UserRole)}
                     className="w-full text-sm px-3 py-2 rounded-lg"
@@ -458,10 +470,11 @@ export default function FanPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <Accessibility size={11} /> Accessibility
+                  <label htmlFor="select-accessibility" className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <Accessibility size={11} aria-hidden="true" /> Accessibility
                   </label>
                   <select
+                    id="select-accessibility"
                     value={accessibilityProfile}
                     onChange={(e) => setAccessibilityProfile(e.target.value as AccessibilityProfile)}
                     className="w-full text-sm px-3 py-2 rounded-lg"
@@ -475,10 +488,11 @@ export default function FanPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <Languages size={11} /> Language
+                  <label htmlFor="select-language" className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <Languages size={11} aria-hidden="true" /> Language
                   </label>
                   <select
+                    id="select-language"
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
                     className="w-full text-sm px-3 py-2 rounded-lg"
@@ -490,10 +504,11 @@ export default function FanPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <Timer size={11} /> Mins to Kickoff
+                  <label htmlFor="input-kickoff" className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <Timer size={11} aria-hidden="true" /> Mins to Kickoff
                   </label>
                   <input
+                    id="input-kickoff"
                     type="number"
                     min={-120}
                     max={300}
@@ -504,10 +519,11 @@ export default function FanPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <Ticket size={11} /> Ticket Section (optional)
+                  <label htmlFor="input-ticket" className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <Ticket size={11} aria-hidden="true" /> Ticket Section (optional)
                   </label>
                   <input
+                    id="input-ticket"
                     type="text"
                     placeholder="e.g. 120B, VIP East"
                     value={ticketSection}
@@ -548,9 +564,10 @@ export default function FanPage() {
                       .then((d) => d?.level && setCrowdLevel(d.level))
                       .catch(() => {});
                   }}
+                  aria-label="Refresh crowd status"
                   className="text-primary-500 hover:text-primary-300 transition-colors"
                 >
-                  <RefreshCw size={11} />
+                  <RefreshCw size={11} aria-hidden="true" />
                 </button>
               </div>
               <CrowdBadge level={crowdLevel} size="md" showIcon={true} />
@@ -581,11 +598,16 @@ export default function FanPage() {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+          <div
+            className="flex-1 overflow-y-auto px-4 py-6 space-y-5"
+            aria-live="polite"
+            aria-label="Chat messages"
+            role="log"
+          >
             {messages.length === 0 && !isWaiting && (
               <div className="flex flex-col items-center justify-center h-full text-center px-6">
-                <div className="text-5xl mb-4">⚽</div>
-                <h3 className="text-xl font-bold text-white mb-2">Welcome to Beyond90 AI</h3>
+                <div className="text-5xl mb-4" aria-hidden="true">⚽</div>
+                <h1 className="text-xl font-bold text-white mb-2">Welcome to Beyond90 AI</h1>
                 <p className="text-primary-300 text-sm max-w-md mb-8">
                   Your intelligent matchday companion for FIFA World Cup 2026. Ask me anything about
                   navigation, crowd status, facilities, or accessibility at {venueLabel}.
@@ -630,6 +652,8 @@ export default function FanPage() {
               <div className="flex-1 relative">
                 <textarea
                   ref={inputRef}
+                  id="chat-input"
+                  aria-label="Message Beyond90 AI"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -644,16 +668,17 @@ export default function FanPage() {
                     t.style.height = Math.min(t.scrollHeight, 128) + 'px';
                   }}
                 />
-                <div className="absolute right-3 bottom-3 text-xs text-primary-600">
+                <div className="absolute right-3 bottom-3 text-xs text-primary-600" aria-hidden="true">
                   {isStreaming || isWaiting ? '' : '↵'}
                 </div>
               </div>
               <button
                 onClick={() => sendMessage(inputText)}
                 disabled={!inputText.trim() || isStreaming || isWaiting}
+                aria-label="Send message"
                 className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center text-primary-900 hover:from-accent-300 hover:to-accent-500 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg self-end"
               >
-                <Send size={18} />
+                <Send size={18} aria-hidden="true" />
               </button>
             </div>
             <p className="text-center text-xs text-primary-600 mt-2">
