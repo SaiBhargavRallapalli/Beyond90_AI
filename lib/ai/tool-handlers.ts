@@ -1,3 +1,15 @@
+/**
+ * Tool call dispatcher for the Claude AI provider.
+ *
+ * Each handler corresponds to one of the six tools declared in the Claude tool
+ * schema. Handlers are called by the streaming loop whenever Claude emits a
+ * `tool_use` content block, and their JSON output is fed back as a `tool_result`
+ * message in the next turn.
+ *
+ * All handlers validate their inputs defensively and return structured JSON
+ * strings — including error payloads — so Claude can incorporate failures into
+ * its response gracefully rather than crashing the stream.
+ */
 import { VENUES } from '@/lib/venues/data';
 import { findRoute, nearestFacilityNode } from '@/lib/venues/graph';
 import { generateCrowdForecast, getCrowdLevel, crowdLevelColor } from '@/lib/venues/crowd';

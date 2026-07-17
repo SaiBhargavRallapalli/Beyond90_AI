@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { streamAssistResponse } from '@/lib/ai/client';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { extractClientIp } from '@/lib/utils/api';
 import type { UserSession, ChatMessage } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -8,9 +9,7 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   // ── Rate limiting ────────────────────────────────────────────────────────
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    ?? req.headers.get('x-real-ip')
-    ?? '127.0.0.1';
+  const ip = extractClientIp(req);
   const rl = checkRateLimit(ip, 'ai');
   if (!rl.allowed) {
     return new Response(

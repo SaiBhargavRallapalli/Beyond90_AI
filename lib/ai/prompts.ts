@@ -1,3 +1,14 @@
+/**
+ * Build the role-specific system prompt for the fan/volunteer/staff/media assistant.
+ *
+ * Each role receives a distinct base directive overlaid with role-appropriate
+ * responsibilities and tone guidance. The returned prompt is injected as the
+ * `system` message for every provider (Groq, Gemini, Claude, MockLLM).
+ *
+ * @param role - The user's role in the tournament context
+ * @param venueName - Full venue name injected into the base prompt
+ * @param language - BCP-47 language tag; instructs the LLM to respond in that language
+ */
 export function buildSystemPrompt(
   role: 'fan' | 'staff' | 'volunteer' | 'media',
   venueName: string,
@@ -61,6 +72,17 @@ Tone: Professional, efficient. Assume the user has full venue credentials unless
   return rolePrompts[role];
 }
 
+/**
+ * Build the system prompt for the Operations Center AI advisor.
+ *
+ * The prompt establishes operational framing — match phase, active alert count —
+ * so the model can prioritise recommendations appropriately without needing
+ * additional context in the user turn.
+ *
+ * @param venueName - Full venue name for grounding
+ * @param minutesToKickoff - Positive = pre-match; negative = in-match / post-match
+ * @param activeAlerts - Number of unacknowledged alerts currently tracked
+ */
 export function buildOpsPrompt(
   venueName: string,
   minutesToKickoff: number,

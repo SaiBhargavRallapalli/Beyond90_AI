@@ -151,6 +151,8 @@ export type AlertSeverity = 'info' | 'warning' | 'critical' | 'emergency';
 export type AlertCategory =
   | 'crowd'
   | 'safety'
+  | 'accessibility'
+  | 'facility'
   | 'infrastructure'
   | 'staff'
   | 'transport'

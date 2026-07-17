@@ -59,7 +59,18 @@ Beyond90 AI addresses every dimension of the challenge brief:
 - **Default provider: Groq** (`llama-3.1-8b-instant`) — fast, zero-latency streaming
 - **Gemini** (`gemini-flash-latest`) — context injection pattern, no function-calling surface
 - **Claude** (`claude-sonnet-4-6`) — 6 structured tools, multi-turn tool use, SSE streaming
+- **MockLLM** — offline fallback; keyword-matched templates for all 7 fan + 4 ops categories
 - Single `AI_PROVIDER` env flag switches the entire backend with no code changes
+
+### Crowd Prediction Engine
+- **Forward-looking analytics** — `GET /api/predict` returns crowd forecasts at T+30, T+60, and T+90-minute horizons
+- Operations teams pre-position staff and open auxiliary exits **before** pressure peaks, not after
+- Deterministic sigmoid model ensures predictions are consistent and cacheable
+
+### Fan-to-Operations Reporting
+- **`POST /api/report`** — fans, volunteers, and staff submit real-time incident reports (safety, accessibility, facility, crowd)
+- Reports are validated, severity-classified, and returned as structured `OperationalAlert` objects
+- Closes the loop between the fan assistant and the operations command layer
 
 ---
 
@@ -77,6 +88,22 @@ Unlike time-tier rules, Beyond90 uses a **continuous sigmoid flow model** per no
 
 ### Context Injection (Gemini / Groq)
 For providers that don't support function calling reliably, venue data, crowd snapshot, and match state are pre-computed locally and injected into the system prompt. This eliminates tool-use surface entirely and prevents `thoughtSignature` errors from Gemini's experimental models.
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/assist` | Streaming fan assistant (raw text chunks + `[METADATA]` sentinel) |
+| `GET` | `/api/crowd` | Live crowd forecast — enriched snapshots, hotspots, safe nodes |
+| `GET` | `/api/ops` | Ops snapshot — attendance, alerts, sustainability, staff deployed |
+| `POST` | `/api/ops` | AI Ops Advisor — natural-language operational recommendations |
+| `GET` | `/api/venues` | Venue registry — all 8 graphs with nodes, edges, facility summary |
+| `GET` | `/api/predict` | **Forward-looking crowd prediction** — T+30/60/90 min horizons |
+| `POST` | `/api/report` | **Fan incident reporting** — safety/accessibility/facility/crowd reports |
+
+All `POST` AI endpoints are rate-limited (20 req/60 s per IP) with `Retry-After` response headers.
 
 ---
 
@@ -213,11 +240,15 @@ beyond90-ai/
 │       ├── assist/route.ts      # Streaming AI endpoint — raw text chunks + METADATA sentinel
 │       ├── crowd/route.ts       # Crowd intelligence API — forecast snapshots per venue
 │       ├── ops/route.ts         # Ops snapshot (GET) + AI ops advisor (POST)
-│       └── venues/route.ts      # Venue graph data API
+│       ├── venues/route.ts      # Venue graph data API
+│       ├── predict/route.ts     # Forward-looking crowd prediction — T+30/60/90 horizons
+│       └── report/route.ts      # Fan-to-ops incident reporting — safety, accessibility, crowd
 ├── lib/
 │   ├── ai/
 │   │   ├── client.ts            # Provider factory — AI_PROVIDER flag + MockLLM fallback
 │   │   ├── context.ts           # Venue context builder — injected into Groq/Gemini system prompt
+│   │   ├── prompts.ts           # Role-specific system prompts (fan/staff/volunteer/media/ops)
+│   │   ├── tool-handlers.ts     # Claude tool dispatcher — 6 tool implementations
 │   │   └── providers/
 │   │       ├── groq.ts          # Groq — OpenAI-compatible, SSE streaming
 │   │       ├── gemini.ts        # Gemini — context injection, no function calling
@@ -227,11 +258,14 @@ beyond90-ai/
 │   │   ├── data.ts              # All 8 WC2026 venue graphs (nodes, edges, facilities)
 │   │   ├── graph.ts             # A* pathfinding + nearestFacilityNode (BFS)
 │   │   └── crowd.ts             # Sigmoid crowd flow model + congestion index
+│   ├── utils/
+│   │   └── api.ts               # Shared route utilities — IP extraction, venue resolution
 │   ├── rateLimit.ts             # Sliding-window rate limiter — LRU eviction, ai/data tiers
 │   └── types.ts                 # Shared TypeScript types
 ├── components/
 │   ├── fan/MessageBubble.tsx
 │   └── shared/
+│       ├── ErrorBoundary.tsx    # React error boundary — role="alert", custom fallback prop
 │       ├── VenueSelector.tsx
 │       └── CrowdBadge.tsx
 └── tests/

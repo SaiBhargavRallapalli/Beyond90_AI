@@ -1,3 +1,19 @@
+/**
+ * Crowd flow model for FIFA WC 2026 smart stadium analytics.
+ *
+ * Occupancy at each venue node is modelled as a continuous, phase-aware sigmoid
+ * function of `minutesToKickoff` rather than a discrete time-tier lookup. This
+ * produces smooth transitions across match phases (pre-match ingress, in-match,
+ * halftime surge, post-match egress) for six node types: gate, concourse,
+ * concession, restroom, seating, and exit.
+ *
+ * The congestion index (0–100) is a composite of occupancy ratio, absolute
+ * inflow density relative to node throughput capacity, and trend direction.
+ * Nodes with index > 70 are flagged as hotspots requiring operational action.
+ *
+ * All functions are pure — no I/O, no randomness — making them fully testable
+ * and safe to call on every API request without caching.
+ */
 import type { VenueGraph, CrowdSnapshot, CrowdForecast } from '@/lib/types';
 
 type NodeClassification = 'gate' | 'concourse' | 'concession' | 'restroom' | 'seating' | 'exit';

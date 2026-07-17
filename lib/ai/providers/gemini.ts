@@ -53,7 +53,8 @@ async function* streamGemini(
     throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   }
 
-  const reader = res.body!.getReader();
+  if (!res.body) throw new Error('Gemini streaming response returned no body.');
+  const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
 

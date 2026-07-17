@@ -66,7 +66,8 @@ async function* streamGroq(messages: GroqMessage[]): AsyncGenerator<string> {
     throw new Error(`Groq ${res.status}: ${err}`);
   }
 
-  const reader = res.body!.getReader();
+  if (!res.body) throw new Error('Groq streaming response returned no body.');
+  const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
 

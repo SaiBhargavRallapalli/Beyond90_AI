@@ -1,7 +1,26 @@
+/**
+ * Venue context builder — injects live intelligence into Groq / Gemini prompts.
+ *
+ * Claude uses structured tool calls instead; this function is only invoked for
+ * providers that don't support reliable function calling. It pre-computes the
+ * crowd forecast locally and serialises the full venue graph (zones, facilities,
+ * walking connections, hotspots) into a structured text block that the model
+ * can reason over without any external calls.
+ *
+ * The returned string is appended to the system prompt, giving the model a
+ * grounded, real-time snapshot that is accurate to the request's `minutesToKickoff`.
+ */
 import { VENUES } from '@/lib/venues/data';
 import { generateCrowdForecast, getCrowdLevel } from '@/lib/venues/crowd';
 import type { UserSession } from '@/lib/types';
 
+/**
+ * Build the live venue intelligence block for a user session.
+ *
+ * @param session - The active user session; `venueId`, `currentNodeId`, and
+ *   `minutesToKickoff` are used to compute the crowd forecast and user location.
+ * @returns A multi-line text block formatted for injection into a system prompt.
+ */
 export function buildVenueContext(session: UserSession): string {
   const venue = VENUES[session.venueId];
   const crowd = generateCrowdForecast(venue, session.minutesToKickoff);

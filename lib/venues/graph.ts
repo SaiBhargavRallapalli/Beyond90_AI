@@ -1,3 +1,16 @@
+/**
+ * Venue navigation engine — A* pathfinding and nearest-facility BFS.
+ *
+ * `findRoute` implements A* with a Euclidean distance heuristic on the venue's
+ * 2D coordinate system. The heuristic is admissible and consistent, guaranteeing
+ * an optimal path while visiting fewer nodes than Dijkstra on this domain.
+ *
+ * `nearestFacilityNode` uses weighted BFS (Dijkstra variant) with early
+ * termination once a candidate is settled and no closer candidate can exist.
+ *
+ * Both functions are pure — they derive all state from the `VenueGraph` argument
+ * and produce no side effects.
+ */
 import type { VenueGraph, VenueNode, NavEdge, RouteSegment, NavigationRoute, Facility } from '@/lib/types';
 
 interface AStarNode {
@@ -289,7 +302,9 @@ export function nearestFacilityNode(
 
   while (queue.length > 0) {
     queue.sort((a, b) => a.distance - b.distance);
-    const { nodeId, distance } = queue.shift()!;
+    const next = queue.shift();
+    if (!next) break;
+    const { nodeId, distance } = next;
 
     if (best && distance > best.distanceMeters) break;
 
